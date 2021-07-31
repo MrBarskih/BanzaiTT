@@ -144,6 +144,18 @@ namespace Equipment{
 
     export class EquipmentFactory
     {
+        private static instance: EquipmentFactory;
+
+        public static GetInstance(): EquipmentFactory
+        {
+            if (EquipmentFactory.instance === undefined) 
+            {
+                EquipmentFactory.instance = new EquipmentFactory();
+            }
+
+            return EquipmentFactory.instance;
+        }
+
         public CreateWeapon(): TypeOfEquipment
         {
             let result:TypeOfEquipment = new Weapon();
@@ -172,6 +184,13 @@ namespace Equipment{
 
 namespace BoosterPacks
 {
+    export enum Type
+    {
+        Common = "Common",
+        Consistent = "Consistent",
+        Fair = "Fair"
+    }
+
     export abstract class BoosterPack
     {
         protected rarity: Rarities.Type;
@@ -381,9 +400,7 @@ namespace BoosterPacks
 
     class FairPack extends BoosterPack
     {   
-        static openedUncommonPacks: number = 0;
-        static openedRarePacks: number = 0;
-        static openedLegendaryPacks: number = 0;
+        static OpenedPacks = new Map<Rarities.Type, number>();
 
         public OpenPack(): Item[]
         {
@@ -393,29 +410,13 @@ namespace BoosterPacks
                 return [];
             }
 
-            let openedFairPackWithRarity
+            let openedFairPackWithRarity = this.GetCountOpenedPacks();
 
-            if (this.rarity === Rarities.Type.Uncommon)
-            {
-                openedFairPackWithRarity = FairPack.openedUncommonPacks;
-            }
-            else if (this.rarity === Rarities.Type.Rare) 
-            {
-                openedFairPackWithRarity = FairPack.openedRarePacks;
-            }
-            else if (this.rarity === Rarities.Type.Legendary)
-            {
-                openedFairPackWithRarity = FairPack.openedLegendaryPacks;
-            }
-            else
-            {
-                openedFairPackWithRarity = 2;
-            }
             if(openedFairPackWithRarity === 24)
-                {
-                    console.log("Maximum of fair pack with rarity " + this.rarity + " was opened." );
-                    return [];
-                }
+            {
+                console.log("Maximum of fair pack with rarity " + this.rarity + " was opened." );
+                return [];
+            }
 
             let countOfItemsWithRarityInWarehouse = this.itemWarehouse.GetCountOfItemsByRarity(this.rarity);
             this.quantityOfRarityItems = Math.ceil(countOfItemsWithRarityInWarehouse / (24 - openedFairPackWithRarity));
@@ -423,6 +424,7 @@ namespace BoosterPacks
             {
                 this.quantityOfRarityItems = 2;
             }
+
             let maxCardInPack = 5;
             this.quantityOfPreviousRarityItmes = maxCardInPack - this.quantityOfRarityItems;
 
@@ -447,21 +449,8 @@ namespace BoosterPacks
                 }
                 this.isOpened = true;
                 
-                if (this.rarity === Rarities.Type.Uncommon)
-                {
-                    FairPack.openedUncommonPacks++;
-                    console.log(FairPack.openedUncommonPacks);
-                }
-                else if (this.rarity === Rarities.Type.Rare) 
-                {
-                    FairPack.openedRarePacks++;
-                    console.log(FairPack.openedRarePacks);
-                }
-                else if (this.rarity === Rarities.Type.Legendary)
-                {
-                    FairPack.openedLegendaryPacks++;
-                    console.log(FairPack.openedLegendaryPacks);
-                }
+                openedFairPackWithRarity++;
+                FairPack.OpenedPacks.set(this.rarity, openedFairPackWithRarity);
             }
             
             this.playerInventory.AddItems(this.items);
@@ -474,10 +463,38 @@ namespace BoosterPacks
             this.items.push(item);
         }
 
+        private GetCountOpenedPacks(): number
+        {
+            let result: number;
+
+            if (FairPack.OpenedPacks.has(this.rarity))
+            {
+                result = FairPack.OpenedPacks.get(this.rarity)!;
+            }
+            else 
+            {
+                FairPack.OpenedPacks.set(this.rarity, 0);
+                result = 0;  
+            }
+
+            return result;
+        }
     }
 
     export class BoosterPackFactory
     {
+        private static instance: BoosterPackFactory;
+
+        public static GetInstance(): BoosterPackFactory
+        {
+            if (BoosterPackFactory.instance === undefined)
+            {
+                BoosterPackFactory.instance = new BoosterPackFactory();
+            }
+            
+            return BoosterPackFactory.instance;
+        }
+
         public CreateCommonPack(rarity: Rarities.Type, itemWarehouse: ItemWarehouse, playerInventory: PlayerInventory): BoosterPack
         {
             let result: BoosterPack = new CommonPack(rarity, itemWarehouse, playerInventory);
@@ -532,13 +549,57 @@ namespace BoosterPacks
             return result;
         }
     }
+
+    export function OpenCommonPack(rarity: Rarities.Type): Item[]
+    {
+        let result: Item[] = [];
+
+        let boosterPackFactory = BoosterPacks.BoosterPackFactory.GetInstance();
+        let boosterPack = boosterPackFactory.CreateCommonPack(rarity, ItemWarehouse.GetInstance(), PlayerInventory.GetInstance());
+
+        result = boosterPack.OpenPack();
+
+        return result;
+    }
+
+    export function GetQuantityPacks(boosterPackType: BoosterPacks.Type, quantity: number): BoosterPacks.BoosterPack[]
+    {
+        let result: BoosterPacks.BoosterPack[] = [];
+
+        let packRarity = Rarities.GetRarityByIndex(SupportFunctions.GetRandomInt(1, Rarities.GetLenght() - 1));
+
+        let boosterPackFactory = BoosterPacks.BoosterPackFactory.GetInstance();
+
+        switch(boosterPackType)
+        {
+            case BoosterPacks.Type.Common : 
+            {
+                result = boosterPackFactory.CreateQuantityCommonPacks(packRarity, ItemWarehouse.GetInstance(), PlayerInventory.GetInstance(), quantity);
+                break;
+            }
+
+            case BoosterPacks.Type.Consistent : 
+            {
+                result = boosterPackFactory.CreateQuantityConsistentPacks(packRarity, ItemWarehouse.GetInstance(), PlayerInventory.GetInstance(), quantity);
+                break;
+            }
+
+            case BoosterPacks.Type.Fair : 
+            {
+                result = boosterPackFactory.CreateQuantityFairPacks(packRarity, ItemWarehouse.GetInstance(), PlayerInventory.GetInstance(), quantity);
+                break;
+            }
+        }
+
+        return result;
+    }
 }
 
 namespace SupportFunctions
 {
-    export function GetRandomInt(max: number) 
+    export function GetRandomInt(min: number, max: number) 
     {
-        return Math.floor(Math.random() * max);
+         return Math.floor(Math.random() * (max - min + 1) + min)
     }
     
     export function CreateQuantityItemsOfEachRarity(typeOfEqupment: Equipment.TypeOfEquipment, quantity: number) : Item[]
@@ -569,7 +630,6 @@ namespace SupportFunctions
         
         return result;
     }
-
 }
 
 class Item 
@@ -613,6 +673,18 @@ class Item
 
 class ItemWarehouse
 {
+    private static instance: ItemWarehouse;
+
+    public static GetInstance(): ItemWarehouse
+    {
+        if (ItemWarehouse.instance === undefined)
+        {
+            ItemWarehouse.instance = new ItemWarehouse();
+        }
+
+        return ItemWarehouse.instance;
+    }
+
     private items: Item[] = [];
 
     public AddItem(item: Item)
@@ -769,6 +841,18 @@ class ItemWarehouse
 
 class PlayerInventory
 {
+    private static instance: PlayerInventory;
+
+    public static GetInstance(): PlayerInventory
+    {
+        if (PlayerInventory.instance === undefined)
+        {
+            PlayerInventory.instance = new PlayerInventory();
+        }
+
+        return PlayerInventory.instance;
+    }
+
     private items: Item[] = [];
 
     public AddItem(item: Item)
@@ -804,12 +888,12 @@ class PlayerInventory
 
 function main()
 {
-    let itemWarehouse: ItemWarehouse = new ItemWarehouse();
-    let equipmetnFactory: Equipment.EquipmentFactory = new Equipment.EquipmentFactory();
-    let boosterPackFactory = new BoosterPacks.BoosterPackFactory();
-    let playerInventory = new PlayerInventory();
+    let itemWarehouse: ItemWarehouse = ItemWarehouse.GetInstance();
+    let equipmetnFactory: Equipment.EquipmentFactory = Equipment.EquipmentFactory.GetInstance();
+    let boosterPackFactory = BoosterPacks.BoosterPackFactory.GetInstance();
+    let playerInventory = PlayerInventory.GetInstance();
 
-    let task: number = 1;
+    let task: number = 3;
     switch(task)
     {
         case 1:
@@ -817,10 +901,9 @@ function main()
             // Скрипт должен содержать базу из 32 предметов (по 2 каждой редкости каждого типа)
             itemWarehouse.AddItems(SupportFunctions.CreateAllItemsOfEachRarity(2)); 
 
-            // Параметром функции является редкость бустерпака
-            let commonPack = boosterPackFactory.CreateCommonPack(Rarities.Type.Uncommon, itemWarehouse, playerInventory);
-            // Скрипт должен также содержать функцию, реализующую открытие бустерпака
-            let result = commonPack.OpenPack();
+            // Скрипт должен также содержать функцию, реализующую открытие бустерпака. Параметром функции является редкость бустерпака
+            let result = BoosterPacks.OpenCommonPack(Rarities.Type.Rare);
+
             //Результатом должны быть 5 предметов, выдаваемых этим бустерпаком 
             console.log(result);
 
@@ -840,7 +923,7 @@ function main()
 
         case 3: 
         {
-            itemWarehouse.AddItems(SupportFunctions.CreateAllItemsOfEachRarity(2));
+            itemWarehouse.AddItems(SupportFunctions.CreateAllItemsOfEachRarity(100));
 
             //(fair_pack) такой, чтобы игрок открыв максимум 24 таких бустерпака редкости X получил все предметы редкости X.
             let fairPack = boosterPackFactory.CreateFairPack(Rarities.Type.Uncommon, itemWarehouse, playerInventory);
@@ -851,9 +934,7 @@ function main()
             console.log(playerInventory);
             
             //Реализовать функцию выдачи N бустерпаков вида X (N, X - параметры)
-            let tenCommonPacks = boosterPackFactory.CreateQuantityCommonPacks(Rarities.Type.Uncommon, itemWarehouse, playerInventory, 10);
-            let tenConsistentPacks = boosterPackFactory.CreateQuantityFairPacks(Rarities.Type.Rare, itemWarehouse, playerInventory, 10);
-            let tenFairPacks = boosterPackFactory.CreateQuantityConsistentPacks(Rarities.Type.Rare, itemWarehouse, playerInventory, 10);
+            let packs = BoosterPacks.GetQuantityPacks(BoosterPacks.Type.Common, 10);
 
             break;
         }
