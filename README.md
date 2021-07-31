@@ -13,4 +13,5 @@ This is a small TT in typeScript.
 4. Player inventory where gained items are stored;
 5. Item storage from where packs take items.
 
-P.S. >I didn't write code in typescript like 2-2.5 years in a row. So it could be a little bit dirty.
+P.S. 
+>I didn't write code in typescript like 2-2.5 years in a row. So it could be a little bit dirty.
